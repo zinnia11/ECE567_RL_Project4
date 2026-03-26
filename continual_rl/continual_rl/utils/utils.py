@@ -1,7 +1,8 @@
 import logging
 import tempfile
 import types
-import gym
+# import gym  # old gym API
+import gymnasium as gym
 import numpy as np
 import random
 import torch
@@ -83,11 +84,12 @@ class Utils(object):
         # torch.seed()
         torch.manual_seed(seed)
 
-        if env is not None:
-            try:
-                env.seed(seed)
-            except:
-                print("Environment does not support seeding")
+        # if env is not None:  # old gym API
+        #     try:
+        #         env.seed(seed)
+        #     except:
+        #         print("Environment does not support seeding")
+        # Note: gymnasium handles seeding via reset(seed=seed) instead of env.seed()
 
         return seed
 
@@ -106,7 +108,7 @@ class Utils(object):
         """
         # Enable both torch dtypes and numpy dtypes
         numpy_to_torch_dtype_dict = {
-            np.bool: torch.bool,
+            np.bool_: torch.bool,
             np.uint8: torch.uint8,
             np.int8: torch.int8,
             np.int16: torch.int16,

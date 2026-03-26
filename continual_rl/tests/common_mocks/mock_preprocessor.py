@@ -1,5 +1,6 @@
 from continual_rl.experiments.tasks.preprocessor_base import PreprocessorBase
-from gym.spaces.box import Box
+# from gym.spaces.box import Box  # old gym API
+from gymnasium.spaces.box import Box
 import torch
 
 

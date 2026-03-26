@@ -1,4 +1,5 @@
-import gym
+# import gym  # old gym API
+import gymnasium as gym
 import numpy as np
 import os
 

@@ -25,7 +25,8 @@
 
 
 from multiprocessing import Process, Pipe
-import gym
+# import gym  # old gym API
+import gymnasium as gym
 import cloudpickle
 from continual_rl.utils.utils import Utils
 
@@ -41,12 +42,16 @@ def worker(conn, env_spec, output_dir):
     while True:
         cmd, data = conn.recv()
         if cmd == "step":
-            obs, reward, done, info = env.step(data)
+            # obs, reward, done, info = env.step(data)  # old gym API
+            obs, reward, terminated, truncated, info = env.step(data)
+            done = terminated or truncated
             if done:
-                obs = env.reset()
+                # obs = env.reset()  # old gym API
+                obs, _ = env.reset()
             conn.send((obs, reward, done, info))
         elif cmd == "reset":
-            obs = env.reset()
+            # obs = env.reset()  # old gym API
+            obs, _ = env.reset()
             conn.send(obs)
         elif cmd == "kill":
             env.close()
@@ -90,15 +95,20 @@ class ParallelEnv(gym.Env):
     def reset(self):
         for local in self.locals:
             local.send(("reset", None))
-        results = [self._local_env.reset()] + [local.recv() for local in self.locals]
+        # results = [self._local_env.reset()] + [local.recv() for local in self.locals]  # old gym API
+        local_obs, _ = self._local_env.reset()
+        results = [local_obs] + [local.recv() for local in self.locals]
         return results
 
     def step(self, actions):
         for local, action in zip(self.locals, actions[1:]):
             local.send(("step", action))
-        obs, reward, done, info = self._local_env.step(actions[0])
+        # obs, reward, done, info = self._local_env.step(actions[0])  # old gym API
+        obs, reward, terminated, truncated, info = self._local_env.step(actions[0])
+        done = terminated or truncated
         if done:
-            obs = self._local_env.reset()
+            # obs = self._local_env.reset()  # old gym API
+            obs, _ = self._local_env.reset()
         results = zip(*[(obs, reward, done, info)] + [local.recv() for local in self.locals])
         return results
 

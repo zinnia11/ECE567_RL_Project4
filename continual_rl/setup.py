@@ -13,7 +13,8 @@ setup(
                       'numpy',
                       'tensorboard',
                       'torch-ac',
-                      'gym[atari]<=0.25.2',
+                      # 'gym[atari]<=0.25.2',  # deprecated, replaced by gymnasium
+                      'gymnasium[atari]',
                       # 'atari-py==0.2.5',  # abandoned, replaced by ale-py
                       'ale-py',
                       'moviepy',

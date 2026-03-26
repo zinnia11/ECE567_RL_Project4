@@ -1,4 +1,7 @@
-import gym
+# import gym  # old gym API
+import gymnasium as gym
+import ale_py  # registers Atari environments with gymnasium
+gym.register_envs(ale_py)
 
 from continual_rl.utils.env_wrappers import (
     NoopResetEnv,

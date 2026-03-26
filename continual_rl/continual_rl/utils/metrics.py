@@ -629,8 +629,10 @@ class Metrics(object):
     
         num_cycles = self._experiment_data["num_cycles_for_forgetting"] #1  # TODO: this is because no metrics are aggregating over cycles anymore... # self._experiment_data["num_cycles"]
         num_tasks = len(self._experiment_data["tasks"])
-        metric_table = np.array(metric_table, dtype=np.float)
-        metric_error_table = np.array(metric_error_table, dtype=np.float)
+        # metric_table = np.array(metric_table, dtype=np.float)  # np.float deprecated
+        metric_table = np.array(metric_table, dtype=np.float64)
+        # metric_error_table = np.array(metric_error_table, dtype=np.float)  # np.float deprecated
+        metric_error_table = np.array(metric_error_table, dtype=np.float64)
         all_mean = np.nanmean(metric_table)  # Compute first, so it's before any averaging across dimensions
     
         if average_over_cycles:
@@ -776,11 +778,15 @@ class Metrics(object):
                         transfer_table[-1][impactor_id] = metric_scale * impactor_id_transfer.mean(axis=0)
                         transfer_error_table[-1][impactor_id] = metric_scale * sem(impactor_id_transfer)
     
-            forgetting_table = np.array(forgetting_table, dtype=np.float)
-            forgetting_error_table = np.array(forgetting_error_table, dtype=np.float)
-    
-            transfer_table = np.array(transfer_table, dtype=np.float)
-            transfer_error_table = np.array(transfer_error_table, dtype=np.float)
+            # forgetting_table = np.array(forgetting_table, dtype=np.float)  # np.float deprecated
+            forgetting_table = np.array(forgetting_table, dtype=np.float64)
+            # forgetting_error_table = np.array(forgetting_error_table, dtype=np.float)  # np.float deprecated
+            forgetting_error_table = np.array(forgetting_error_table, dtype=np.float64)
+
+            # transfer_table = np.array(transfer_table, dtype=np.float)  # np.float deprecated
+            transfer_table = np.array(transfer_table, dtype=np.float64)
+            # transfer_error_table = np.array(transfer_error_table, dtype=np.float)  # np.float deprecated
+            transfer_error_table = np.array(transfer_error_table, dtype=np.float64)
     
             # Complete the corners by aggregating all data from each run
             # Forgetting corner

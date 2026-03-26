@@ -1,4 +1,5 @@
-import gym
+# import gym  # old gym API
+import gymnasium as gym
 
 from .image_task import ImageTask
 
