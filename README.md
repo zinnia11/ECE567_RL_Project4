@@ -17,3 +17,23 @@ In NumPy 2.0, ```np.float``` is deprecated, so we change that type to the new ``
 
 Previous environments in Gym should still exist under the same name in Gymnasium, so no further edits are needed. All previous code is commented out for record keeping. 
 
+## Environment setup
+
+We recommend using Pip to set up the environment, as the ```environment.yml``` file is old and has a lot of conflicts.
+
+First create and activate a virtual environment:
+
+```
+python3 -m venv <env name>
+source <env name>/bin/activate
+```
+
+Then install Pytorch and the project + dependencies:
+
+```
+pip install torch torchvision
+pip install -e .
+```
+
+Now you should be ready to run experiments. 
+
