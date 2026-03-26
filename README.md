@@ -2,7 +2,7 @@
 
 ## Changes made to the environment
 
-The CORA Github repository was last updated in June 2023. Since then, OpenAI Gym was replaced by Gymnasium (November 2023) and NumPy was updated to NumPy 2.0 (June 2024). This means that some packages in CORA are difficult to use in present day. 
+The CORA Github repository was last updated in June 2023. Since then, OpenAI Gym was replaced by Gymnasium (November 2023) and NumPy was updated to NumPy 2.0 (June 2024). This means that some packages in CORA are different to use in present day. 
 
 We update the environment by updating the dependencies and code to reflect more modern versions.
 
