@@ -24,7 +24,7 @@ We recommend using Pip to set up the environment, as the ```environment.yml``` f
 First create and activate a virtual environment:
 
 ```
-python3 -m venv <env name>
+python3.9 -m venv <env name>
 source <env name>/bin/activate
 ```
 
