@@ -24,7 +24,7 @@ We recommend using Pip to set up the environment, as the ```environment.yml``` f
 First create and activate a virtual environment:
 
 ```
-python3.9 -m venv <env name>
+python3 -m venv <env name>
 source <env name>/bin/activate
 ```
 
@@ -32,6 +32,8 @@ Then install Pytorch and the project + dependencies:
 
 ```
 pip install torch torchvision
+pip install torch==1.13.1+cu117 torchvision==0.14.1+cu117 --extra-index-url https://download.pytorch.org/whl/cu117 numpy==1.23.5 gym[atari]==0.25.2 atari-py==0.2.5
+pip install torch==2.2.0 torchvision==0.17.0 numpy==1.23.5 gym[atari]==0.25.2 atari-py==0.2.5
 pip install -e .
 ```
 
