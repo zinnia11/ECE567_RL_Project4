@@ -34,15 +34,13 @@ source <env name>/bin/activate
 Then install Pytorch and the project + dependencies:
 
 ```
-pip install torch torchvision
 pip install torch==1.13.1+cu117 torchvision==0.14.1+cu117 --extra-index-url https://download.pytorch.org/whl/cu117 numpy==1.23.5 gym[atari]==0.25.2 atari-py==0.2.5
-pip install torch==2.2.0 torchvision==0.17.0 numpy==1.23.5 gym[atari]==0.25.2 atari-py==0.2.5
 pip install -e .
 ```
 
 ### On Great Lakes
 
-On the Great Lakes HPC, there is no Python 3.9 version, we recommend creating a conda environment, .
+On the Great Lakes HPC, there is no Python 3.9 version, we recommend creating a conda environment.
 
 ```
 conda create -n <env name> python=3.9 -y
@@ -52,4 +50,16 @@ conda activate <env name>
 Then install the packages using pip.
 
 Now you should be ready to run experiments. 
+
+## Experiments 
+
+### Procgen
+
+Install Procgen first:
+```
+pip install procgen
+```
+
+
+
 
