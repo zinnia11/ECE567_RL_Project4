@@ -24,7 +24,7 @@ We recommend using Pip to set up the environment, as the ```environment.yml``` f
 First create and activate a virtual environment:
 
 ```
-python3 -m venv <env name>
+python3.9 -m venv <env name>
 source <env name>/bin/activate
 ```
 
@@ -36,6 +36,17 @@ pip install torch==1.13.1+cu117 torchvision==0.14.1+cu117 --extra-index-url http
 pip install torch==2.2.0 torchvision==0.17.0 numpy==1.23.5 gym[atari]==0.25.2 atari-py==0.2.5
 pip install -e .
 ```
+
+### On Great Lakes
+
+On the Great Lakes HPC, there is no Python 3.9 version, we recommend creating a conda environment, .
+
+```
+conda create -n <env name> python=3.9 -y
+conda activate <env name>
+```
+
+Then install the packages using pip.
 
 Now you should be ready to run experiments. 
 
