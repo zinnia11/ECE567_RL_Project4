@@ -32,6 +32,7 @@ Then install Pytorch and the project + dependencies:
 
 ```
 pip install torch torchvision
+pip install torch==1.13.1+cu117 torchvision==0.14.1+cu117 --extra-index-url https://download.pytorch.org/whl/cu117 numpy==1.23.5 gym[atari]==0.25.2 atari-py==0.2.5
 pip install -e .
 ```
 
