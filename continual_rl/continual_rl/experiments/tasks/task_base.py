@@ -64,7 +64,10 @@ class TaskBase(ABC):
         timestep = log.get("timestep", None) or default_timestep
 
         if type == "video":
-            summary_writer.add_video(tag, value, global_step=timestep)
+            try:
+                summary_writer.add_video(tag, value, global_step=timestep)
+            except (ImportError, TypeError) as e:
+                print(f"Warning: Failed to log video '{tag}': {e}. Skipping video logging.")
         elif type == "scalar":
             summary_writer.add_scalar(tag, value, global_step=timestep)
         elif type == "image":

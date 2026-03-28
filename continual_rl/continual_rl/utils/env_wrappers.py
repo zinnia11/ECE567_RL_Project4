@@ -30,10 +30,8 @@ import numpy as np
 import os
 os.environ.setdefault('PATH', '')
 from collections import deque
-# import gym
-# from gym import spaces
-import gymnasium as gym
-from gymnasium import spaces
+import gym
+from gym import spaces
 import torch
 import cv2
 cv2.ocl.setUseOpenCL(False)
@@ -52,17 +50,17 @@ class NoopResetEnv(gym.Wrapper):
 
     def reset(self, **kwargs):
         """ Do no-op action for a number of steps in [1, noop_max]."""
-        obs, info = self.env.reset(**kwargs)
+        obs = self.env.reset(**kwargs)
         if self.override_num_noops is not None:
             noops = self.override_num_noops
         else:
-            noops = self.unwrapped.np_random.integers(1, self.noop_max + 1)
+            noops = self.unwrapped.np_random.randint(1, self.noop_max + 1)
         assert noops > 0
         for _ in range(noops):
-            obs, _, terminated, truncated, info = self.env.step(self.noop_action)
-            if terminated or truncated:
-                obs, info = self.env.reset(**kwargs)
-        return obs, info
+            obs, _, done, _ = self.env.step(self.noop_action)
+            if done:
+                obs = self.env.reset(**kwargs)
+        return obs
 
     def step(self, ac):
         return self.env.step(ac)
@@ -76,22 +74,14 @@ class FireResetEnv(gym.Wrapper):
         assert len(env.unwrapped.get_action_meanings()) >= 3
 
     def reset(self, **kwargs):
-        # self.env.reset(**kwargs)  # old gym API
-        obs, info = self.env.reset(**kwargs)
-        # obs, _, done, _ = self.env.step(1)  # old gym API
-        obs, _, terminated, truncated, info = self.env.step(1)
-        # if done:  # old gym API
-        if terminated or truncated:
-            # self.env.reset(**kwargs)  # old gym API
-            obs, info = self.env.reset(**kwargs)
-        # obs, _, done, _ = self.env.step(2)  # old gym API
-        obs, _, terminated, truncated, info = self.env.step(2)
-        # if done:  # old gym API
-        if terminated or truncated:
-            # self.env.reset(**kwargs)  # old gym API
-            obs, info = self.env.reset(**kwargs)
-        # return obs  # old gym API
-        return obs, info
+        self.env.reset(**kwargs)
+        obs, _, done, _ = self.env.step(1)
+        if done:
+            self.env.reset(**kwargs)
+        obs, _, done, _ = self.env.step(2)
+        if done:
+            self.env.reset(**kwargs)
+        return obs
 
     def step(self, ac):
         return self.env.step(ac)
@@ -110,9 +100,8 @@ class EpisodicLifeEnv(gym.Wrapper):
         self.real_episode_return = 0
 
     def step(self, action):
-        # obs, reward, done, info = self.env.step(action)  # old gym API
-        obs, reward, terminated, truncated, info = self.env.step(action)
-        self.was_real_done = terminated or truncated
+        obs, reward, done, info = self.env.step(action)
+        self.was_real_done = done
         self.real_episode_return += reward
         episode_return_to_report = None
 
@@ -123,8 +112,7 @@ class EpisodicLifeEnv(gym.Wrapper):
             # for Qbert sometimes we stay in lives == 0 condition for a few frames
             # so it's important to keep lives > 0, so that we only reset once
             # the environment advertises done.
-            # done = True  # old gym API
-            terminated = True
+            done = True
 
         if self.was_real_done:
             episode_return_to_report = self.real_episode_return
@@ -137,8 +125,7 @@ class EpisodicLifeEnv(gym.Wrapper):
         info["episode_return"] = episode_return_to_report
 
         self.lives = lives
-        # return obs, reward, done, info  # old gym API
-        return obs, reward, terminated, truncated, info
+        return obs, reward, done, info
 
     def reset(self, **kwargs):
         """Reset only when lives are exhausted.
@@ -146,15 +133,12 @@ class EpisodicLifeEnv(gym.Wrapper):
         and the learner need not know about any of this behind-the-scenes.
         """
         if self.was_real_done:
-            # obs = self.env.reset(**kwargs)  # old gym API
-            obs, info = self.env.reset(**kwargs)
+            obs = self.env.reset(**kwargs)
         else:
             # no-op step to advance from terminal/lost life state
-            # obs, _, _, _ = self.env.step(0)  # old gym API
-            obs, _, _, _, info = self.env.step(0)
+            obs, _, _, _ = self.env.step(0)
         self.lives = self.env.unwrapped.ale.lives()
-        # return obs  # old gym API
-        return obs, info
+        return obs
 
 
 class MaxAndSkipEnv(gym.Wrapper):
@@ -168,25 +152,21 @@ class MaxAndSkipEnv(gym.Wrapper):
     def step(self, action):
         """Repeat action, sum reward, and max over last observations."""
         total_reward = 0.0
-        terminated = False
-        truncated = False
+        done = False
         for i in range(self._skip):
-            # obs, reward, done, info = self.env.step(action)  # old gym API
-            obs, reward, terminated, truncated, info = self.env.step(action)
+            obs, reward, done, info = self.env.step(action)
             if i == self._skip - 2: self._obs_buffer[0] = obs
             if i == self._skip - 1: self._obs_buffer[1] = obs
             total_reward += reward
-            if terminated or truncated:
+            if done:
                 break
         # Note that the observation on the done=True frame
         # doesn't matter
         max_frame = self._obs_buffer.max(axis=0)
 
-        # return max_frame, total_reward, done, info  # old gym API
-        return max_frame, total_reward, terminated, truncated, info
+        return max_frame, total_reward, done, info
 
     def reset(self, **kwargs):
-        # return self.env.reset(**kwargs)  # old gym API
         return self.env.reset(**kwargs)
 
 
@@ -284,17 +264,15 @@ class FrameStack(gym.Wrapper):
                                             shape=(k, *shp), dtype=env.observation_space.dtype)
 
     def reset(self, **kwargs):
-        # ob = self.env.reset()  # old gym API
-        ob, info = self.env.reset(**kwargs)
+        ob = self.env.reset(**kwargs)
         for _ in range(self.k):
             self.frames.append(ob)
-        return self._get_ob(), info
+        return self._get_ob()
 
     def step(self, action):
-        # ob, reward, done, info = self.env.step(action)  # old gym API
-        ob, reward, terminated, truncated, info = self.env.step(action)
+        ob, reward, done, info = self.env.step(action)
         self.frames.append(ob)
-        return self._get_ob(), reward, terminated, truncated, info
+        return self._get_ob(), reward, done, info
 
     def _get_ob(self):
         assert len(self.frames) == self.k
@@ -367,18 +345,15 @@ class TimeLimit(gym.Wrapper):
         self._elapsed_steps = 0
 
     def step(self, ac):
-        # observation, reward, done, info = self.env.step(ac)  # old gym API
-        observation, reward, terminated, truncated, info = self.env.step(ac)
+        observation, reward, done, info = self.env.step(ac)
         self._elapsed_steps += 1
         if self._elapsed_steps >= self._max_episode_steps:
-            truncated = True
+            done = True
             info['TimeLimit.truncated'] = True
-        # return observation, reward, done, info  # old gym API
-        return observation, reward, terminated, truncated, info
+        return observation, reward, done, info
 
     def reset(self, **kwargs):
         self._elapsed_steps = 0
-        # return self.env.reset(**kwargs)  # old gym API
         return self.env.reset(**kwargs)
 
 
@@ -390,7 +365,6 @@ class ClipActionsWrapper(gym.Wrapper):
         return self.env.step(action)
 
     def reset(self, **kwargs):
-        # return self.env.reset(**kwargs)  # old gym API
         return self.env.reset(**kwargs)
 
 
@@ -430,6 +404,5 @@ class FixedSetWrapper(gym.Wrapper):
 
     def reset(self, **kwargs):
         seed = np.random.choice(self._seeds)
-        # self._env.seed(int(seed))  # old gym API
-        # return self._env.reset()  # old gym API
-        return self._env.reset(seed=int(seed), **kwargs)
+        self._env.seed(int(seed))
+        return self._env.reset()

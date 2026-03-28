@@ -37,9 +37,7 @@ class Environment:
         self.episode_return = torch.zeros(1, 1)
         self.episode_step = torch.zeros(1, 1, dtype=torch.int32)
         initial_done = torch.zeros(1, 1, dtype=torch.uint8)  # Originally this was ones, which makes there be 0 reward episodes
-        # initial_frame = _format_frame(self.gym_env.reset())  # old gym API
-        initial_obs, _ = self.gym_env.reset()
-        initial_frame = _format_frame(initial_obs)
+        initial_frame = _format_frame(self.gym_env.reset())  
         return dict(
             frame=initial_frame,
             reward=initial_reward,
@@ -50,16 +48,13 @@ class Environment:
         )
 
     def step(self, action):
-        # frame, reward, done, prior_info = self.gym_env.step(action.item())  # old gym API
-        frame, reward, terminated, truncated, prior_info = self.gym_env.step(action.item())
-        done = terminated or truncated
+        frame, reward, done, prior_info = self.gym_env.step(action.item())
         self.episode_step += 1
         self.episode_return += reward
         episode_step = self.episode_step
         episode_return = self.episode_return
         if done:
-            # frame = self.gym_env.reset()  # old gym API
-            frame, _ = self.gym_env.reset()
+            frame = self.gym_env.reset()
             self.episode_return = torch.zeros(1, 1)
             self.episode_step = torch.zeros(1, 1, dtype=torch.int32)
 

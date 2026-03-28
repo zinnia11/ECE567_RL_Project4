@@ -1,8 +1,7 @@
 import torch
 import numpy as np
 import gym_minigrid  # Needed for Utils.make_env
-# import gym  # old gym API
-import gymnasium as gym
+import gym
 from continual_rl.experiments.tasks.task_base import TaskBase
 from continual_rl.experiments.tasks.preprocessor_base import PreprocessorBase
 from continual_rl.utils.utils import Utils

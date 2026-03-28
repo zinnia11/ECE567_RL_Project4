@@ -1,3 +1,6 @@
+import os
+os.environ["OMP_NUM_THREADS"] = "1"
+
 import sys
 from torch import multiprocessing
 from torch.utils.tensorboard.writer import SummaryWriter

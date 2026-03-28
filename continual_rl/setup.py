@@ -10,13 +10,11 @@ setup(
     py_modules=['continual_rl.available_policies', 'continual_rl.experiment_specs'],
     install_requires=['setuptools==59.5.0',
                       'uuid',
-                      'numpy',
+                      'numpy<1.24',
                       'tensorboard',
                       'torch-ac',
-                      # 'gym[atari]<=0.25.2',  # deprecated, replaced by gymnasium
-                      'gymnasium[atari]',
-                      # 'atari-py==0.2.5',  # abandoned, replaced by ale-py
-                      'ale-py',
+                      'gym[atari]<=0.25.2',
+                      'atari-py==0.2.5',
                       'moviepy',
                       'dotmap',
                       'psutil',
