@@ -9,7 +9,16 @@
 #SBATCH --output=logs/%x-%j.log
 #SBATCH --error=logs/%x-%j-E.log
 #
-
+# Scratch (GPFS): fast, not backed up — only active job data. Copy checkpoints / TB logs to
+# durable storage when finished; do not rely on /scratch for long-term retention.
+#
+# Personal scratch root (yafeng0): /scratch/yafeng_root/yafeng0/<username>
+#   e.g. user peisen → /scratch/yafeng_root/yafeng0/peisen
+# Group share (same account): /scratch/yafeng_root/yafeng0/shared_data
+#
+# Default SCRATCH_PROJECT_ROOT is set below; override with:
+#   export SCRATCH_PROJECT_ROOT=/scratch/yafeng_root/yafeng0/peisen
+# Or only set CONTINUAL_RL_LARGE / PNC_OUTPUT_DIR.
 
 set -euo pipefail
 
@@ -27,7 +36,15 @@ source ~/repo/exp/cont_rl/bin/activate
 
 mkdir -p logs
 
-LARGE_ROOT="${CONTINUAL_RL_LARGE:-${SCRATCH:-${HOME}/scratch}/continual_rl_data}"
+# Personal scratch root already includes username — do not append ${USER} again.
+SCRATCH_PROJECT_ROOT="${SCRATCH_PROJECT_ROOT:-/scratch/yafeng_root/yafeng0/${USER}}"
+
+# large_file_path (replay / file-backed buffers) + run outputs
+if [[ -n "${CONTINUAL_RL_LARGE:-}" ]]; then
+  LARGE_ROOT="${CONTINUAL_RL_LARGE}"
+else
+  LARGE_ROOT="${SCRATCH_PROJECT_ROOT}/continual_rl_data"
+fi
 mkdir -p "${LARGE_ROOT}"
 
 CONFIG_REL="${PNC_CONFIG:-configs/atari/pnc_atari.json}"
@@ -37,7 +54,11 @@ if [[ ! -f "${CONFIG_ABS}" ]]; then
   exit 1
 fi
 
-OUT_DIR="${PNC_OUTPUT_DIR:-${REPO_ROOT}/runs/pnc_atari_${SLURM_JOB_ID:-local}}"
+if [[ -n "${PNC_OUTPUT_DIR:-}" ]]; then
+  OUT_DIR="${PNC_OUTPUT_DIR}"
+else
+  OUT_DIR="${SCRATCH_PROJECT_ROOT}/runs/pnc_${SLURM_JOB_ID:-local}"
+fi
 mkdir -p "${OUT_DIR}"
 
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
@@ -66,6 +87,7 @@ trap cleanup EXIT
 
 echo "=== P&C Atari ==="
 echo "REPO_ROOT=${REPO_ROOT}"
+echo "SCRATCH_PROJECT_ROOT=${SCRATCH_PROJECT_ROOT}"
 echo "CONFIG=${CONFIG_ABS}"
 echo "LARGE_ROOT=${LARGE_ROOT}"
 echo "OUT_DIR=${OUT_DIR}"
