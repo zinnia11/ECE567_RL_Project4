@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=ewc-atari
 #SBATCH --account=yafeng0
-#SBATCH --partition=spgpu
+#SBATCH --partition=gpu-rtx6000
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=64
 #SBATCH --mem=128G
