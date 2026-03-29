@@ -54,7 +54,12 @@ class NoopResetEnv(gym.Wrapper):
         if self.override_num_noops is not None:
             noops = self.override_num_noops
         else:
-            noops = self.unwrapped.np_random.randint(1, self.noop_max + 1)
+            rng = self.unwrapped.np_random
+            # Gymnasium uses numpy.random.Generator (integers); old gym used RandomState (randint).
+            if hasattr(rng, "integers"):
+                noops = int(rng.integers(1, self.noop_max + 1))
+            else:
+                noops = int(rng.randint(1, self.noop_max + 1))
         assert noops > 0
         for _ in range(noops):
             obs, _, done, _ = self.env.step(self.noop_action)
