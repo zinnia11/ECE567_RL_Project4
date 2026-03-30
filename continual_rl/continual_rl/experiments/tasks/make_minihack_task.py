@@ -59,7 +59,14 @@ def make_minihack(
     savedir=None,  # save_tty=False -> savedir=None, see https://github.com/MiniHackPlanet/MiniHack/blob/e124ae4c98936d0c0b3135bf5f202039d9074508/minihack/agent/common/envs/tasks.py#L168
     **kwargs,
 ):
-    import minihack
+    try:
+        import minihack  # noqa: F401 — registers Gym env IDs
+    except ModuleNotFoundError as e:
+        raise ModuleNotFoundError(
+            "MiniHack is not installed. Install NLE, then MiniHack "
+            "(continual_rl/docs/BENCHMARK_INSTALL.md; "
+            "https://github.com/MiniHackPlanet/MiniHack)."
+        ) from e
 
     env = gym.make(
         f"MiniHack-{env_name}",
