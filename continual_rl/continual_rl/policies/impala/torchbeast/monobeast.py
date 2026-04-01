@@ -15,6 +15,7 @@
 # and modified
 
 import os
+import sys
 import logging
 import pprint
 import time
@@ -26,7 +27,6 @@ import psutil
 import numpy as np
 import queue
 import cloudpickle
-from torch.multiprocessing import Pool
 import threading
 import json
 import shutil
@@ -924,7 +924,11 @@ class Monobeast():
             # If we are in the last batch, only do the necessary number, otherwise do the max num in parallel
             batch_num_episodes = min(num_episodes - batch_start_id, self._model_flags.eval_episode_num_parallel)
 
-            with Pool(processes=batch_num_episodes) as pool:
+            # main.py sets multiprocessing start method to "spawn" for PyTorch. torch.multiprocessing.Pool
+            # follows that, so eval workers would not inherit gym/Atari registrations from the parent.
+            # Training actors use an explicit "fork" context; use the same here on Linux/macOS.
+            pool_ctx = py_mp.get_context("spawn" if sys.platform == "win32" else "fork")
+            with pool_ctx.Pool(processes=batch_num_episodes) as pool:
                 async_objs = []
                 for episode_id in range(batch_num_episodes):
                     pickled_args = cloudpickle.dumps((task_flags, self.logger, self.actor_model))

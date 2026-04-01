@@ -4,45 +4,73 @@ import os
 
 from .image_task import ImageTask
 
-
-class MiniHackObsWrapper(gym.ObservationWrapper):
-    def __init__(self, env):
-        super().__init__(env)
-        self.observation_space = gym.spaces.Box(low=0, high=255, dtype=np.uint8, shape=(84, 84, 3))
-
-    def observation(self, obs):
-        obs = obs["pixel_crop"]
-        obs = np.pad(obs, [(2, 2), (2, 2), (0, 0)])
-        return obs
+try:
+    import gymnasium as gymnasium
+except ImportError:
+    gymnasium = None
 
 
-# from https://github.com/MiniHackPlanet/MiniHack/blob/e9c8c20fb2449d1f87163314f9b3617cf4f0e088/minihack/scripts/venv_demo.py#L28
-class MiniHackMakeVecSafeWrapper(gym.Wrapper):
-    def __init__(self, env):
-        super().__init__(env)
-        self.basedir = os.getcwd()
+def _minihack_wrapper_classes(gym_mod):
+    """Build MiniHack-specific wrappers against either gym or gymnasium."""
 
-    def step(self, action: int):
-        os.chdir(self.env.env._vardir)
-        x = self.env.step(action)
-        os.chdir(self.basedir)
-        return x
+    class MiniHackObsWrapper(gym_mod.ObservationWrapper):
+        def __init__(self, env):
+            super().__init__(env)
+            self.observation_space = gym_mod.spaces.Box(
+                low=0, high=255, dtype=np.uint8, shape=(84, 84, 3)
+            )
 
-    def reset(self):
-        os.chdir(self.env.env._vardir)
-        x = self.env.reset()
-        os.chdir(self.basedir)
-        return x
+        def observation(self, obs):
+            obs = obs["pixel_crop"]
+            obs = np.pad(obs, [(2, 2), (2, 2), (0, 0)])
+            return obs
 
-    def close(self):
-        os.chdir(self.env.env._vardir)
-        self.env.close()
-        os.chdir(self.basedir)
+    # from https://github.com/MiniHackPlanet/MiniHack/blob/e9c8c20fb2449d1f87163314f9b3617cf4f0e088/minihack/scripts/venv_demo.py#L28
+    class MiniHackMakeVecSafeWrapper(gym_mod.Wrapper):
+        def __init__(self, env):
+            super().__init__(env)
+            self.basedir = os.getcwd()
 
-    def seed(self, core=None, disp=None, reseed=False):
-        os.chdir(self.env.env._vardir)
-        self.env.seed(core, disp, reseed)
-        os.chdir(self.basedir)
+        def step(self, action: int):
+            os.chdir(self.env.env._vardir)
+            x = self.env.step(action)
+            os.chdir(self.basedir)
+            return x
+
+        def reset(self, **kwargs):
+            os.chdir(self.env.env._vardir)
+            x = self.env.reset(**kwargs)
+            os.chdir(self.basedir)
+            return x
+
+        def close(self):
+            os.chdir(self.env.env._vardir)
+            self.env.close()
+            os.chdir(self.basedir)
+
+        def seed(self, core=None, disp=None, reseed=False):
+            os.chdir(self.env.env._vardir)
+            self.env.seed(core, disp, reseed)
+            os.chdir(self.basedir)
+
+    return MiniHackMakeVecSafeWrapper, MiniHackObsWrapper
+
+
+if gymnasium is not None:
+
+    class _OldGymStepResetWrapper(gymnasium.Wrapper):
+        """Map Gymnasium step/reset API to pre-v0.26 gym (obs only; done = term | trunc)."""
+
+        def reset(self, **kwargs):
+            obs, _info = self.env.reset(**kwargs)
+            return obs
+
+        def step(self, action):
+            obs, reward, terminated, truncated, info = self.env.step(action)
+            return obs, reward, terminated or truncated, info
+
+else:
+    _OldGymStepResetWrapper = None
 
 
 # Ref: https://github.com/MiniHackPlanet/MiniHack/blob/e124ae4c98936d0c0b3135bf5f202039d9074508/minihack/agent/polybeast/config.yaml#L48
@@ -59,10 +87,17 @@ def make_minihack(
     savedir=None,  # save_tty=False -> savedir=None, see https://github.com/MiniHackPlanet/MiniHack/blob/e124ae4c98936d0c0b3135bf5f202039d9074508/minihack/agent/common/envs/tasks.py#L168
     **kwargs,
 ):
-    import minihack
+    try:
+        import minihack  # noqa: F401 — registers env IDs (Gymnasium in current MiniHack)
+    except ModuleNotFoundError as e:
+        raise ModuleNotFoundError(
+            "MiniHack is not installed. Install NLE, then MiniHack "
+            "(continual_rl/docs/BENCHMARK_INSTALL.md; "
+            "https://github.com/MiniHackPlanet/MiniHack)."
+        ) from e
 
-    env = gym.make(
-        f"MiniHack-{env_name}",
+    env_id = f"MiniHack-{env_name}"
+    make_kw = dict(
         observation_keys=observation_keys,
         reward_win=reward_win,
         reward_lose=reward_lose,
@@ -72,9 +107,25 @@ def make_minihack(
         character=character,
         savedir=savedir,
         **kwargs,
-    )  # each env specifies its own self._max_episode_steps
-    env = MiniHackMakeVecSafeWrapper(env)
-    env = MiniHackObsWrapper(env)
+    )
+
+    # Current MiniHack registers with Gymnasium; old installs used gym only.
+    if gymnasium is not None:
+        from gymnasium.error import NameNotFound as GymnasiumNameNotFound
+
+        try:
+            env = gymnasium.make(env_id, **make_kw)
+            env = _OldGymStepResetWrapper(env)
+            MakeVec, Obs = _minihack_wrapper_classes(gymnasium)
+        except GymnasiumNameNotFound:
+            env = gym.make(env_id, **make_kw)
+            MakeVec, Obs = _minihack_wrapper_classes(gym)
+    else:
+        env = gym.make(env_id, **make_kw)
+        MakeVec, Obs = _minihack_wrapper_classes(gym)
+
+    env = MakeVec(env)
+    env = Obs(env)
     return env
 
 

@@ -19,6 +19,7 @@ In NumPy 2.0, ```np.float``` is deprecated, so we change that type to the new ``
 Previous environments in Gym should still exist under the same name in Gymnasium, so no further edits are needed. All previous code is commented out for record keeping. 
 
 -->
+Original Repo: https://github.com/AGI-Labs/continual_rl
 
 ## Environment setup
 
@@ -34,15 +35,13 @@ source <env name>/bin/activate
 Then install Pytorch and the project + dependencies:
 
 ```
-pip install torch torchvision
 pip install torch==1.13.1+cu117 torchvision==0.14.1+cu117 --extra-index-url https://download.pytorch.org/whl/cu117 numpy==1.23.5 gym[atari]==0.25.2 atari-py==0.2.5
-pip install torch==2.2.0 torchvision==0.17.0 numpy==1.23.5 gym[atari]==0.25.2 atari-py==0.2.5
 pip install -e .
 ```
 
 ### On Great Lakes
 
-On the Great Lakes HPC, there is no Python 3.9 version, we recommend creating a conda environment, .
+On the Great Lakes HPC, there is no Python 3.9 version, we recommend creating a conda environment.
 
 ```
 conda create -n <env name> python=3.9 -y
@@ -52,4 +51,36 @@ conda activate <env name>
 Then install the packages using pip.
 
 Now you should be ready to run experiments. 
+
+## Experiments 
+
+### Procgen
+
+Install Procgen first:
+
+```
+pip install procgen
+```
+
+Then run the experiments from the configs folder in the repo.
+
+```
+python main.py --config-file configs/procgen/<baseline>_procgen.json
+```
+
+## Metrics
+
+To generate the metrics from the CORA paper, first install the following packages:
+
+```
+pip install plotly kaleido "tensorflow==2.12.*" pandas scipy cloudpickle jinja2
+```
+
+Code to generate our metrics are in the ```reproduce_metrics.py``` file. Run the following command to generate HTML files of the graphs.
+
+```
+python continual_rl/utils/reproduce_metrics.py -d <results directory>
+```
+
+Our graphs are in the results folder of the repository. 
 
