@@ -19,6 +19,7 @@ In NumPy 2.0, ```np.float``` is deprecated, so we change that type to the new ``
 Previous environments in Gym should still exist under the same name in Gymnasium, so no further edits are needed. All previous code is commented out for record keeping. 
 
 -->
+Original Repo: https://github.com/AGI-Labs/continual_rl
 
 ## Environment setup
 
@@ -56,10 +57,30 @@ Now you should be ready to run experiments.
 ### Procgen
 
 Install Procgen first:
+
 ```
 pip install procgen
 ```
 
+Then run the experiments from the configs folder in the repo.
 
+```
+python main.py --config-file configs/procgen/<baseline>_procgen.json
+```
 
+## Metrics
+
+To generate the metrics from the CORA paper, first install the following packages:
+
+```
+pip install plotly kaleido "tensorflow==2.12.*" pandas scipy cloudpickle jinja2
+```
+
+Code to generate our metrics are in the ```reproduce_metrics.py``` file. Run the following command to generate HTML files of the graphs.
+
+```
+python continual_rl/utils/reproduce_metrics.py -d <results directory>
+```
+
+Our graphs are in the results folder of the repository. 
 
