@@ -8,10 +8,11 @@ import cloudpickle as pickle
 from scipy.stats import sem
 
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # see https://github.com/plotly/Kaleido/issues/101
-import plotly.io as pio
-pio.kaleido.scope.mathjax = None  # Prevents a weird "Loading MathJax" artifact in rendering the pdf
+# import plotly.io as pio
+# pio.kaleido.scope.mathjax = None  # Prevents a weird "Loading MathJax" artifact in rendering the pdf
 
 
 USE_ISOLATED_ZSFT = True
@@ -440,11 +441,133 @@ class Metrics(object):
                         fillcolor="rgba(230, 236, 245, 0.3)"
                     )
     
-            fig.write_image(f'{which_exp}_{task_i}.pdf')
+            # fig.write_image(f'{which_exp}_{task_i}.pdf')
+            # fig.show()
+            fig.write_html(f'{which_exp}_{task_i}.html')
             figures[task_i] = fig
-            fig.show()
     
         return figures
+
+    def plot_models_combined(self, d):
+        # Plot all tasks as a grid with one legend
+        num_task_steps = self._experiment_data['num_task_steps']
+        num_cycles = self._experiment_data['num_cycles']
+        num_tasks = self._experiment_data.get('num_tasks', len(self._experiment_data['tasks']))
+        x_range = [-10, num_task_steps * num_tasks * num_cycles]
+
+        axis_size = self._experiment_data['axis_size']
+        axis_label_size = self._experiment_data['axis_label_size']
+        legend_size = self._experiment_data['legend_size']
+        title_size = self._experiment_data['title_size']
+        which_exp = self._experiment_data['which_exp']
+
+        grid_size = self._experiment_data.get('grid_size', [2, 3])
+        nrows, ncols = grid_size
+
+        task_names = list(self._experiment_data['tasks'].keys())
+        fig = make_subplots(
+            rows=nrows, cols=ncols,
+            subplot_titles=task_names,
+            horizontal_spacing=0.08,
+            vertical_spacing=0.12,
+        )
+
+        legend_added = set()
+
+        for task_i, (task_k, task_v) in enumerate(self._experiment_data['tasks'].items()):
+            row = task_i // ncols + 1
+            col = task_i % ncols + 1
+
+            y_range = task_v.get('y_range', None)
+            train_regions = task_v.get('train_regions', None)
+            yaxis_dtick = task_v.get('yaxis_dtick', None)
+
+            tag = f"{self._experiment_data['tag_base']}/{task_v['i']}"
+            if 'eval_i' in task_v.keys():
+                eval_tag = f"{self._experiment_data['tag_base']}/{task_v['eval_i']}"
+            else:
+                eval_tag = None
+
+            for model_k, model_v in self._experiment_data['models'].items():
+                data = d[model_k][tag]
+
+                _kwargs = {}
+                if eval_tag is not None:
+                    _kwargs = dict(alpha=0.5, dash='dash', mean_showlegend=False)
+
+                low_trace, trace, up_trace = self.create_scatters(data, model_k, model_v, **_kwargs)
+
+                show_in_legend = model_k not in legend_added and trace.showlegend
+                if show_in_legend and eval_tag is None:
+                    legend_added.add(model_k)
+                trace.showlegend = show_in_legend if eval_tag is None else False
+
+                fig.add_trace(low_trace, row=row, col=col)
+                fig.add_trace(trace, row=row, col=col)
+                fig.add_trace(up_trace, row=row, col=col)
+
+            if eval_tag is not None:
+                for model_k, model_v in self._experiment_data['models'].items():
+                    data = d[model_k][eval_tag]
+
+                    low_trace, trace, up_trace = self.create_scatters(data, model_k, model_v)
+
+                    show_in_legend = model_k not in legend_added
+                    if show_in_legend:
+                        legend_added.add(model_k)
+                    trace.showlegend = show_in_legend
+
+                    fig.add_trace(low_trace, row=row, col=col)
+                    fig.add_trace(trace, row=row, col=col)
+                    fig.add_trace(up_trace, row=row, col=col)
+
+            yaxis_range = [y_range[0], y_range[1] * 1.01]
+
+            xaxis_key = f'xaxis{task_i + 1}' if task_i > 0 else 'xaxis'
+            yaxis_key = f'yaxis{task_i + 1}' if task_i > 0 else 'yaxis'
+
+            fig.update_layout(**{
+                xaxis_key: dict(
+                    range=x_range,
+                    tickvals=self._experiment_data.get('xaxis_tickvals', None),
+                    tickfont=dict(size=axis_size),
+                ),
+                yaxis_key: dict(
+                    range=yaxis_range,
+                    tick0=0,
+                    dtick=yaxis_dtick,
+                    tickfont=dict(size=axis_size),
+                    gridcolor='rgb(230,236,245)',
+                ),
+            })
+
+            if train_regions is not None:
+                for shaded_region in train_regions:
+                    fig.add_shape(
+                        type="rect",
+                        xref=f'x{task_i + 1}' if task_i > 0 else 'x',
+                        yref=f'y{task_i + 1}' if task_i > 0 else 'y',
+                        x0=shaded_region[0],
+                        y0=y_range[0],
+                        x1=shaded_region[1],
+                        y1=y_range[1],
+                        line=dict(
+                            color="rgba(150, 150, 180, .3)",
+                            width=1,
+                        ),
+                        fillcolor="rgba(230, 236, 245, 0.3)"
+                    )
+
+        fig.update_layout(
+            height=400 * nrows,
+            width=500 * ncols,
+            legend=dict(font=dict(size=legend_size, color="black")),
+            plot_bgcolor='rgb(255,255,255)',
+            title=dict(text=which_exp, font=dict(size=title_size)),
+        )
+
+        fig.write_html(f'{which_exp}_all.html')
+        return fig
 
     def get_rewards_for_region(self, xs, ys, region):
             valid_x_mask_lower = xs > region[0] if region[0] is not None else True  # If we have no lower bound specified, all xs are valid
@@ -862,4 +985,5 @@ class Metrics(object):
                 print(f"{model_k}: task {task_key}: final performance: {task_data[1][final_index]:.2f} \pm {task_data[2][final_index]:.2f}")
     
         self.plot_models(d)
+        self.plot_models_combined(d)
         self.plot_metrics(all_metrics)
