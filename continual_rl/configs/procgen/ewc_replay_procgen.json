@@ -1,0 +1,21 @@
+[
+    {
+        "policy": "online_ewc",
+        "experiment": "procgen_6_tasks_5_cycles",
+        "epsilon": 0.01,
+        "num_actors": 32,
+        "batch_size": 32,
+        "unroll_length": 20,
+        "entropy_cost": 0.01,
+        "learning_rate": 4e-4,
+        "num_learner_threads": 2,
+        "ewc_lambda": 175,
+        "normalize_fisher_method": "row",
+        "replay_buffer_frames": 1e6,
+        "replay_loss_coef": 0.1,
+        "bc_coef": 0.05,
+        "replay_batch_size": 32,
+        "min_replay_frames": 1000,
+        "large_file_path": "/home/zznie/ECE567_RL_Project4/ECE567_RL_Project4/continual_rl/scratch"
+    }
+]
