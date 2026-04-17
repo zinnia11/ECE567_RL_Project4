@@ -56,6 +56,18 @@ def load_online_ewc():
     return PolicyStruct(EWCPolicy, OnlineEWCPolicyConfig)
 
 
+def load_ewc_replay():
+    from continual_rl.policies.ewc_replay.ewc_replay_policy import EWCReplayPolicy
+    from continual_rl.policies.ewc_replay.ewc_replay_policy_config import EWCPolicyConfig
+    return PolicyStruct(EWCReplayPolicy, EWCPolicyConfig)
+
+
+def load_online_ewc_replay():
+    from continual_rl.policies.ewc_replay.ewc_replay_policy import EWCReplayPolicy
+    from continual_rl.policies.ewc_replay.ewc_replay_policy_config import OnlineEWCPolicyConfig
+    return PolicyStruct(EWCReplayPolicy, OnlineEWCPolicyConfig)
+
+
 def load_progress_and_compress():
     from continual_rl.policies.progress_and_compress.progress_and_compress_policy import ProgressAndCompressPolicy
     from continual_rl.policies.progress_and_compress.progress_and_compress_policy_config import ProgressAndCompressPolicyConfig
@@ -85,6 +97,8 @@ def get_available_policies():
                          "clear": load_clear,
                          "ewc": load_ewc,
                          "online_ewc": load_online_ewc,
+                         "ewc_replay": load_ewc_replay,
+                         "online_ewc_replay": load_online_ewc_replay,
                          "progress_and_compress": load_progress_and_compress,
                          "play": load_play,
                          "sane": load_sane_ensemble})

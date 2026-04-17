@@ -5,6 +5,7 @@ import json
 import shutil
 import os
 import random
+import torch.nn.functional as F
 from continual_rl.policies.impala.torchbeast.monobeast import Monobeast, Buffers
 from continual_rl.utils.utils import Utils
 
@@ -199,29 +200,75 @@ class EWCMonobeast(Monobeast):
 
         return final_ewc_loss / 2.0
     
-    # for sampling across tasks
-    def _sample_any_task_replay(self, batch_size):
-        valid_tasks = [
-            task_id for task_id, task in self._tasks.items()
-            if task.total_steps > 0
+
+    def _get_replay_ready_task_ids(self):
+        return [
+            task_id
+            for task_id, task_info in self._tasks.items()
+            if int(task_info.total_steps[0].item()) >= self._model_flags.min_replay_frames
         ]
 
+    def _sample_single_replay_entry(self, task_id, random_state):
+        task_info = self._get_task(task_id)
+        actor_order = list(range(self._model_flags.num_actors))
+        random_state.shuffle(actor_order)
+
+        for actor_index in actor_order:
+            entries_in_buffer = int(
+                min(task_info.replay_buffer_counters[actor_index].item(), self._entries_per_buffer)
+            )
+            if entries_in_buffer > 0:
+                buffer_index = random_state.randint(0, entries_in_buffer)
+                return {
+                    key: task_info.replay_buffers[key][actor_index][buffer_index]
+                    for key in task_info.replay_buffers
+                }
+
+        return None
+
+    def _stack_replay_entries(self, replay_entries):
+        if len(replay_entries) == 0:
+            return None
+
+        replay_batch = {
+            key: torch.stack([entry[key] for entry in replay_entries], dim=1)
+            for key in replay_entries[0]
+        }
+
+        return {
+            key: value.to(device=self._model_flags.device, non_blocking=True)
+            for key, value in replay_batch.items()
+        }
+
+    # Mix replay across tasks so each replay batch can contain samples from multiple tasks.
+    def _sample_any_task_replay(self, batch_size):
+        valid_tasks = self._get_replay_ready_task_ids()
         if len(valid_tasks) == 0:
-            return None, None
+            return None, []
 
-        task_id = random.choice(valid_tasks)
-        batch = self._sample_from_task_replay_buffer(task_id, batch_size)
+        random_state = np.random.RandomState()
+        replay_entries = []
+        sampled_task_ids = []
+        max_attempts = max(batch_size * 4, 1)
 
-        return batch, task_id
-    
-    # new loss for replay buffer to train on replay data. 
+        while len(replay_entries) < batch_size and max_attempts > 0:
+            task_id = random.choice(valid_tasks)
+            replay_entry = self._sample_single_replay_entry(task_id, random_state)
+            if replay_entry is not None:
+                replay_entries.append(replay_entry)
+                sampled_task_ids.append(task_id)
+            max_attempts -= 1
+
+        replay_batch = self._stack_replay_entries(replay_entries)
+        return replay_batch, sampled_task_ids
+
     def _compute_replay_loss(self, task_flags, model):
         replay_batch, _ = self._sample_any_task_replay(
             self._model_flags.replay_batch_size
         )
 
         if replay_batch is None:
-            return 0.0, None
+            return torch.zeros((), device=next(model.parameters()).device), None
 
         _, stats, pg_loss, baseline_loss = super().compute_loss(
             self._model_flags,
@@ -235,23 +282,20 @@ class EWCMonobeast(Monobeast):
         replay_loss = pg_loss + baseline_loss
 
         return replay_loss, replay_batch
-    
-    # kl loss from clear
-    def _compute_bc_loss(self, model, replay_batch):
+
+    # KL behavior cloning on replay, mirroring CLEAR-lite policy cloning.
+    def _compute_bc_loss(self, task_flags, model, replay_batch):
         if replay_batch is None:
-            return 0.0
+            return torch.zeros((), device=next(model.parameters()).device)
 
         old_logits = replay_batch["policy_logits"].detach()
-
-        learner_outputs = model(replay_batch)
+        learner_outputs, _ = model(replay_batch, task_flags.action_space_id, ())
         new_logits = learner_outputs["policy_logits"]
 
         # Flatten time + batch
         T, B, A = new_logits.shape
         new_logits = new_logits.view(T * B, A)
         old_logits = old_logits.view(T * B, A)
-
-        import torch.nn.functional as F
 
         bc_loss = F.kl_div(
             F.log_softmax(new_logits, dim=-1),
@@ -308,19 +352,18 @@ class EWCMonobeast(Monobeast):
             self._prev_task_id = cur_task_id
 
         # ewc loss logic from previous loss        
-        if self._model_flags.online_ewc or self._get_task(cur_task_id).total_steps >= self._model_flags.ewc_per_task_min_frames:
-            ewc_loss = self._model_flags.ewc_lambda * self._compute_ewc_loss(task_flags, model)
+        if self._model_flags.online_ewc or int(self._get_task(cur_task_id).total_steps[0].item()) >= self._model_flags.ewc_per_task_min_frames:
+            ewc_loss = self._compute_ewc_loss(task_flags, model)
             stats = {"ewc_loss": ewc_loss.item() if isinstance(ewc_loss, torch.Tensor) else ewc_loss}
         else:
-            ewc_loss = 0.0
-            ewc_stat = 0.0
+            ewc_loss = torch.zeros((), device=next(model.parameters()).device)
+            stats = {"ewc_loss": 0.0}
 
         # new: replay loss
         replay_loss, replay_batch = self._compute_replay_loss(task_flags, model)
-        replay_loss_scaled = self._model_flags.replay_loss_coef * replay_loss
 
         # new: behavior cloning loss
-        bc_loss = self._compute_bc_loss(model, replay_batch)
+        bc_loss = self._compute_bc_loss(task_flags, model, replay_batch)
 
         # new: total loss
         total_loss = (
@@ -354,6 +397,8 @@ class EWCMonobeast(Monobeast):
         # estimate Fisher information matrix
         for i in range(self._model_flags.n_fisher_samples):
             task_replay_batch = self._sample_from_task_replay_buffer(task_id, self._model_flags.batch_size)
+            if task_replay_batch is None:
+                continue
 
             # NOTE: setting initial_agent_state to an empty list, not sure if this is correct?
             # Calling Monobeast's loss explicitly to make sure the loss is the right one (PnC overrides it)
@@ -418,29 +463,13 @@ class EWCMonobeast(Monobeast):
         return self._tasks[task_lookup_label]
 
     def _sample_from_task_replay_buffer(self, task_id, batch_size):
-        task_info = self._get_task(task_id)
         replay_entry_count = batch_size
-        shuffled_subset = []  # Will contain a list of tuples of (actor_index, buffer_index)
         random_state = np.random.RandomState()
+        replay_entries = []
 
-        # Select a random actor, and from that, a random buffer entry.
         for _ in range(replay_entry_count):
-            actor_index = random_state.randint(0, self._model_flags.num_actors)
+            replay_entry = self._sample_single_replay_entry(task_id, random_state)
+            if replay_entry is not None:
+                replay_entries.append(replay_entry)
 
-            # We may not have anything in this buffer yet, so check for that (randint complains)
-            entries_in_buffer = min(task_info.replay_buffer_counters[actor_index], self._entries_per_buffer)
-            if entries_in_buffer > 0:
-                buffer_index = random_state.randint(0, entries_in_buffer)
-                shuffled_subset.append((actor_index, buffer_index))
-
-        replay_batch = {
-            # Get the actor_index and entry_id from the raw id
-            key: torch.stack([task_info.replay_buffers[key][actor_id][buffer_id]
-                              for actor_id, buffer_id in shuffled_subset], dim=1) for key in task_info.replay_buffers
-        }
-
-        replay_batch = {
-            k: t.to(device=self._model_flags.device, non_blocking=True)
-            for k, t in replay_batch.items()
-        }
-        return replay_batch
+        return self._stack_replay_entries(replay_entries)

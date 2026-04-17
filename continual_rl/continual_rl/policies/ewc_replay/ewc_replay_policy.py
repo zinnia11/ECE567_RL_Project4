@@ -1,9 +1,9 @@
 from continual_rl.policies.impala.impala_policy import ImpalaPolicy
-from continual_rl.policies.ewc.ewc_policy_config import EWCPolicyConfig
-from continual_rl.policies.ewc.ewc_monobeast import EWCMonobeast 
+from continual_rl.policies.ewc_replay.ewc_replay_policy_config import EWCPolicyConfig
+from continual_rl.policies.ewc_replay.ewc_replay_monobeast import EWCMonobeast
 
 
-class EWCPolicy(ImpalaPolicy):
+class EWCReplayPolicy(ImpalaPolicy):
     def __init__(self, config: EWCPolicyConfig, observation_space, action_spaces, impala_class: EWCMonobeast = None,
                  policy_net_class=None):
         if impala_class is None:
@@ -14,3 +14,7 @@ class EWCPolicy(ImpalaPolicy):
 
     def set_task_ids(self, task_ids):
         self.impala_trainer.initialize_tasks(task_ids)
+
+
+class EWCPolicy(EWCReplayPolicy):
+    pass
