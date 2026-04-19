@@ -338,10 +338,11 @@ class Monobeast():
         timings.time("device")
         return batch, initial_agent_state
 
-    def compute_loss(self, model_flags, task_flags, learner_model, batch, initial_agent_state, with_custom_loss=True):
+    def compute_loss(self, model_flags, task_flags, learner_model, batch, initial_agent_state, with_custom_loss=True, learner_outputs=None):
         # Note the action_space_id isn't really used - it's used to generate an action, but we use the action that
         # was already computed and executed
-        learner_outputs, unused_state = learner_model(batch, task_flags.action_space_id, initial_agent_state)
+        if learner_outputs is None:
+            learner_outputs, unused_state = learner_model(batch, task_flags.action_space_id, initial_agent_state)
 
         # Take final value function slice for bootstrapping.
         bootstrap_value = learner_outputs["baseline"][-1]

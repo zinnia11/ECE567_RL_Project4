@@ -268,7 +268,9 @@ class EWCMonobeast(Monobeast):
         )
 
         if replay_batch is None:
-            return torch.zeros((), device=next(model.parameters()).device), None
+            return torch.zeros((), device=next(model.parameters()).device), None, None
+
+        learner_outputs, _ = model(replay_batch, task_flags.action_space_id, ())
 
         _, stats, pg_loss, baseline_loss = super().compute_loss(
             self._model_flags,
@@ -277,14 +279,15 @@ class EWCMonobeast(Monobeast):
             replay_batch,
             [],
             with_custom_loss=False,
+            learner_outputs=learner_outputs,
         )
 
         replay_loss = pg_loss + baseline_loss
 
-        return replay_loss, replay_batch
+        return replay_loss, replay_batch, learner_outputs
 
     # KL behavior cloning on replay, mirroring CLEAR-lite policy cloning
-    def _compute_bc_loss(self, task_flags, model, replay_batch):
+    def _compute_bc_loss(self, model, replay_batch, learner_outputs):
         if replay_batch is None:
             zero = torch.zeros((), device=next(model.parameters()).device)
             return zero, zero
@@ -292,7 +295,6 @@ class EWCMonobeast(Monobeast):
         old_logits = replay_batch["policy_logits"].detach()
         old_value = replay_batch["baseline"].detach()
 
-        learner_outputs, _ = model(replay_batch, task_flags.action_space_id, ())
         new_logits = learner_outputs["policy_logits"]
         new_value = learner_outputs["baseline"]
 
@@ -356,16 +358,16 @@ class EWCMonobeast(Monobeast):
         # ewc loss logic from previous loss        
         if self._model_flags.online_ewc or int(self._get_task(cur_task_id).total_steps[0].item()) >= self._model_flags.ewc_per_task_min_frames:
             ewc_loss = self._compute_ewc_loss(task_flags, model)
-            stats = {"ewc_loss": ewc_loss.item() if isinstance(ewc_loss, torch.Tensor) else ewc_loss}
+            # stats = {"ewc_loss": ewc_loss.item() if isinstance(ewc_loss, torch.Tensor) else ewc_loss}
         else:
             ewc_loss = torch.zeros((), device=next(model.parameters()).device)
-            stats = {"ewc_loss": 0.0}
+            # stats = {"ewc_loss": 0.0}
 
         # new: replay loss
-        replay_loss, replay_batch = self._compute_replay_loss(task_flags, model)
+        replay_loss, replay_batch, learner_outputs = self._compute_replay_loss(task_flags, model)
 
         # new: behavior cloning loss
-        bc_loss, value_cloning_loss = self._compute_bc_loss(task_flags, model, replay_batch)
+        bc_loss, value_cloning_loss = self._compute_bc_loss(model, replay_batch, learner_outputs)
 
         # new: total loss
         total_loss = (
