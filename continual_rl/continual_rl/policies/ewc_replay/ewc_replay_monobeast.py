@@ -304,8 +304,8 @@ class EWCMonobeast(Monobeast):
         )
 
         value_cloning_loss = ((new_value - old_value) ** 2).mean()
+        
         return bc_loss, value_cloning_loss
-
 
     # def custom_loss(self, task_flags, model, initial_agent_state, batch, vtrace_returns):
     #     """
@@ -365,20 +365,22 @@ class EWCMonobeast(Monobeast):
         replay_loss, replay_batch = self._compute_replay_loss(task_flags, model)
 
         # new: behavior cloning loss
-        bc_loss = self._compute_bc_loss(task_flags, model, replay_batch)
+        bc_loss, value_cloning_loss = self._compute_bc_loss(task_flags, model, replay_batch)
 
         # new: total loss
         total_loss = (
             self._model_flags.ewc_lambda * ewc_loss +
             self._model_flags.replay_loss_coef * replay_loss +
-            self._model_flags.bc_coef * bc_loss
+            self._model_flags.bc_coef * bc_loss +
+            self._model_flags.value_cloning_cost * value_cloning_loss
         )
 
         # save stats
         stats = {
             "ewc_loss": ewc_loss.item() if isinstance(ewc_loss, torch.Tensor) else ewc_loss,
             "replay_loss": replay_loss.item() if isinstance(replay_loss, torch.Tensor) else replay_loss,
-            "bc_loss": bc_loss.item() if isinstance(bc_loss, torch.Tensor) else bc_loss,
+            "bc_loss": bc_loss.item() if isinstance(bc_loss, torch.Tensor) else bc_loss, 
+            "value_cloning_loss": value_cloning_loss.item() if isinstance(value_cloning_loss, torch.Tensor) else value_cloning_loss,
         }
 
 
