@@ -283,27 +283,29 @@ class EWCMonobeast(Monobeast):
 
         return replay_loss, replay_batch
 
-    # KL behavior cloning on replay, mirroring CLEAR-lite policy cloning.
+    # KL behavior cloning on replay, mirroring CLEAR-lite policy cloning
     def _compute_bc_loss(self, task_flags, model, replay_batch):
         if replay_batch is None:
-            return torch.zeros((), device=next(model.parameters()).device)
+            zero = torch.zeros((), device=next(model.parameters()).device)
+            return zero, zero
 
         old_logits = replay_batch["policy_logits"].detach()
+        old_value = replay_batch["baseline"].detach()
+
         learner_outputs, _ = model(replay_batch, task_flags.action_space_id, ())
         new_logits = learner_outputs["policy_logits"]
+        new_value = learner_outputs["baseline"]
 
-        # Flatten time + batch
         T, B, A = new_logits.shape
-        new_logits = new_logits.view(T * B, A)
-        old_logits = old_logits.view(T * B, A)
-
         bc_loss = F.kl_div(
-            F.log_softmax(new_logits, dim=-1),
-            F.softmax(old_logits, dim=-1),
+            F.log_softmax(new_logits.view(T * B, A), dim=-1),
+            F.softmax(old_logits.view(T * B, A), dim=-1),
             reduction="batchmean",
         )
 
-        return bc_loss
+        value_cloning_loss = ((new_value - old_value) ** 2).mean()
+        return bc_loss, value_cloning_loss
+
 
     # def custom_loss(self, task_flags, model, initial_agent_state, batch, vtrace_returns):
     #     """
