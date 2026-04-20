@@ -385,7 +385,6 @@ class EWCMonobeast(Monobeast):
             "value_cloning_loss": value_cloning_loss.item() if isinstance(value_cloning_loss, torch.Tensor) else value_cloning_loss,
         }
 
-
         return total_loss, stats
 
     def checkpoint_task(self, task_id, task_flags, model, online=False):

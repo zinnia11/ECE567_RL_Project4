@@ -38,6 +38,7 @@ class EWCPolicyConfig(ImpalaPolicyConfig):
         self.bc_coef = 0.05
         self.replay_batch_size = 32
         self.min_replay_frames = 1000
+        self.value_cloning_cost = 0.005
 
         # NOTE:
         # the original EWC paper augments the network with
