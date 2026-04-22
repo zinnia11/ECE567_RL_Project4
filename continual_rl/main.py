@@ -1,6 +1,19 @@
 import os
 os.environ["OMP_NUM_THREADS"] = "1"
 
+# Optional reproducibility: sbatch job arrays export CONTINUAL_RL_SEED per run.
+_seed_env = os.environ.get("CONTINUAL_RL_SEED")
+if _seed_env is not None:
+    import random
+    import numpy as np
+    import torch
+    _s = int(_seed_env)
+    random.seed(_s)
+    np.random.seed(_s)
+    torch.manual_seed(_s)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(_s)
+
 import sys
 from torch import multiprocessing
 from torch.utils.tensorboard.writer import SummaryWriter
