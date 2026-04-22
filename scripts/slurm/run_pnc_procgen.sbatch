@@ -47,11 +47,7 @@ exec > >(tee -a "${OUT_DIR}/run.log") 2>&1
 module purge
 module load gcc/10.3.0
 
-if [[ -f "/sw/pkgs/arc/python3.11-anaconda/2024.02-1/etc/profile.d/conda.sh" ]]; then
-  # shellcheck source=/dev/null
-  . "/sw/pkgs/arc/python3.11-anaconda/2024.02-1/etc/profile.d/conda.sh"
-fi
-conda activate cora
+source ~/repo/exp/cont_rl/bin/activate
 
 if [[ ! -f "${CONFIG_ABS}" ]]; then
   echo "ERROR: config not found: ${CONFIG_ABS}"
