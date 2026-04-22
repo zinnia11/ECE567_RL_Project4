@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=pnc-minihack
+#SBATCH --job-name=ewc-minihack
 #SBATCH --account=yafeng0
 #SBATCH --partition=gpu-rtx6000
 #SBATCH --gres=gpu:1
@@ -10,13 +10,13 @@
 #SBATCH --mem=128G
 #SBATCH --output=/dev/null
 #
-# Progress & Compress on MiniHack — aligned with scripts/slurm/run_clear_minihack.sh (ARC + conda cora).
-# Config: continual_rl/configs/minihack/pnc_minihack.json (minihack_nav_paired_2_cycles).
+# Online EWC on MiniHack — aligned with scripts/slurm/run_clear_minihack.sh (ARC + conda cora).
+# Requires: NLE + MiniHack, repo layout with continual_rl/main.py under submit directory.
 #
 # Override before sbatch:
 #   export LARGE_ROOT=/path/to/scratch/replay_root
-#   export CONFIG_ABS=$PWD/continual_rl/configs/minihack/pnc_minihack.json
-#   export OUT_DIR=/path/to/output
+#   export CONFIG_ABS=$PWD/continual_rl/configs/minihack/ewc_minihack.json
+#   export OUT_DIR=/path/to/output   (optional; default ./srun_log/ewc-minihack_<jobid>)
 
 set -euo pipefail
 
@@ -27,8 +27,8 @@ if [[ ! -f "${REPO_ROOT}/continual_rl/main.py" ]]; then
 fi
 
 LARGE_ROOT="${LARGE_ROOT:-/scratch/yafeng_root/yafeng0/peisen}"
-CONFIG_ABS="${CONFIG_ABS:-${REPO_ROOT}/continual_rl/configs/minihack/pnc_minihack.json}"
-OUT_DIR="${OUT_DIR:-${REPO_ROOT}/srun_log/${SLURM_JOB_NAME:-pnc-minihack}_${SLURM_JOB_ID:-local}}"
+CONFIG_ABS="${CONFIG_ABS:-${REPO_ROOT}/continual_rl/configs/minihack/ewc_minihack.json}"
+OUT_DIR="${OUT_DIR:-${REPO_ROOT}/srun_log/${SLURM_JOB_NAME:-ewc-minihack}_${SLURM_JOB_ID:-local}}"
 
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
 export PYTHONUNBUFFERED=1
@@ -51,7 +51,7 @@ if [[ ! -f "${CONFIG_ABS}" ]]; then
   exit 1
 fi
 
-RUN_JSON="$(mktemp /tmp/pnc_minihack_run_XXXXXX.json)"
+RUN_JSON="$(mktemp /tmp/ewc_minihack_run_XXXXXX.json)"
 export LARGE_ROOT CONFIG_ABS RUN_JSON
 python3 - <<'PY'
 import json, os
@@ -71,7 +71,7 @@ PY
 cleanup() { rm -f "${RUN_JSON}"; }
 trap cleanup EXIT
 
-echo "=== P&C MiniHack ==="
+echo "=== EWC MiniHack ==="
 echo "REPO_ROOT=${REPO_ROOT}"
 echo "CONFIG=${CONFIG_ABS}"
 echo "LARGE_ROOT=${LARGE_ROOT}"
