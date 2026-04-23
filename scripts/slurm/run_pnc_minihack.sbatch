@@ -1,55 +1,74 @@
 #!/bin/bash
 #SBATCH --job-name=pnc-minihack
 #SBATCH --account=yafeng0
-#SBATCH --partition=gpu-rtx6000
-#SBATCH --gres=gpu:1
-#SBATCH --time=1-00:00:00
-#SBATCH --nodes=1
-#SBATCH --tasks-per-node=1
-#SBATCH --cpus-per-task=16
+#SBATCH --partition=gpu
+#SBATCH --gpus=1
+#SBATCH --cpus-per-task=64
 #SBATCH --mem=128G
-#SBATCH --output=/dev/null
+#SBATCH --time=144:00:00
+#SBATCH --output=logs/%x-%j-%a.log
+#SBATCH --error=logs/%x-%j-%a-E.log
+#SBATCH --array=0-2
 #
-# Progress & Compress on MiniHack — aligned with scripts/slurm/run_clear_minihack.sh (ARC + conda cora).
-# Config: continual_rl/configs/minihack/pnc_minihack.json (minihack_nav_paired_2_cycles).
+# Progress & Compress on MiniHack — three seeds (#SBATCH --array must match length of SEEDS).
+# Same stack as scripts/slurm/run_pnc_procgen.sbatch / run_pnc_atari.sbatch:
+#   module load python/3.9  ->  libpython3.9.so before venv.
+# Requires NLE + MiniHack in ~/repo/exp/cont_rl.
 #
-# Override before sbatch:
-#   export LARGE_ROOT=/path/to/scratch/replay_root
-#   export CONFIG_ABS=$PWD/continual_rl/configs/minihack/pnc_minihack.json
-#   export OUT_DIR=/path/to/output
+# Optional env vars:
+#   CONTINUAL_RL_LARGE    override large_file_path root (default: ${SCRATCH_PROJECT_ROOT}/continual_rl_data)
+#   PNC_CONFIG            config path relative to continual_rl/, default configs/minihack/pnc_minihack.json
+#   PNC_OUTPUT_DIR        fixed output dir (overrides per-seed default)
+#   SCRATCH_PROJECT_ROOT  scratch base (default /scratch/yafeng_root/yafeng0/${USER})
 
 set -euo pipefail
 
 REPO_ROOT="${SLURM_SUBMIT_DIR:-$(pwd)}"
-if [[ ! -f "${REPO_ROOT}/continual_rl/main.py" ]]; then
+CR="${REPO_ROOT}/continual_rl"
+if [[ ! -f "${CR}/main.py" ]]; then
   echo "ERROR: continual_rl/main.py not found under REPO_ROOT=${REPO_ROOT}"
   exit 1
 fi
 
-LARGE_ROOT="${LARGE_ROOT:-/scratch/yafeng_root/yafeng0/peisen}"
-CONFIG_ABS="${CONFIG_ABS:-${REPO_ROOT}/continual_rl/configs/minihack/pnc_minihack.json}"
-OUT_DIR="${OUT_DIR:-${REPO_ROOT}/srun_log/${SLURM_JOB_NAME:-pnc-minihack}_${SLURM_JOB_ID:-local}}"
-
-export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
-export PYTHONUNBUFFERED=1
-export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
-
-mkdir -p "${OUT_DIR}"
-exec > >(tee -a "${OUT_DIR}/run.log") 2>&1
-
 module purge
-module load gcc/10.3.0
+module load python/3.9
 
-if [[ -f "/sw/pkgs/arc/python3.11-anaconda/2024.02-1/etc/profile.d/conda.sh" ]]; then
-  # shellcheck source=/dev/null
-  . "/sw/pkgs/arc/python3.11-anaconda/2024.02-1/etc/profile.d/conda.sh"
+source ~/repo/exp/cont_rl/bin/activate
+
+mkdir -p logs
+
+SCRATCH_PROJECT_ROOT="${SCRATCH_PROJECT_ROOT:-/scratch/yafeng_root/yafeng0/${USER}}"
+
+if [[ -n "${CONTINUAL_RL_LARGE:-}" ]]; then
+  LARGE_ROOT="${CONTINUAL_RL_LARGE}"
+else
+  LARGE_ROOT="${SCRATCH_PROJECT_ROOT}/continual_rl_data"
 fi
-conda activate cora
+mkdir -p "${LARGE_ROOT}"
 
+SEEDS=(42 123 456)
+TASK_ID="${SLURM_ARRAY_TASK_ID:-0}"
+SEED="${SEEDS[$TASK_ID]}"
+export CONTINUAL_RL_SEED="${SEED}"
+
+CONFIG_REL="${PNC_CONFIG:-configs/minihack/pnc_minihack.json}"
+CONFIG_ABS="${CR}/${CONFIG_REL}"
 if [[ ! -f "${CONFIG_ABS}" ]]; then
   echo "ERROR: config not found: ${CONFIG_ABS}"
   exit 1
 fi
+
+if [[ -n "${PNC_OUTPUT_DIR:-}" ]]; then
+  OUT_DIR="${PNC_OUTPUT_DIR}"
+else
+  OUT_DIR="${SCRATCH_PROJECT_ROOT}/runs/pnc_minihack_${SLURM_JOB_ID:-local}_seed${SEED}_task${TASK_ID}"
+fi
+mkdir -p "${OUT_DIR}"
+exec > >(tee -a "${OUT_DIR}/run.log") 2>&1
+
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
+export PYTHONUNBUFFERED=1
+export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
 
 RUN_JSON="$(mktemp /tmp/pnc_minihack_run_XXXXXX.json)"
 export LARGE_ROOT CONFIG_ABS RUN_JSON
@@ -71,14 +90,15 @@ PY
 cleanup() { rm -f "${RUN_JSON}"; }
 trap cleanup EXIT
 
-echo "=== P&C MiniHack ==="
+echo "=== P&C MiniHack seed=${SEED} (array task ${TASK_ID}) ==="
 echo "REPO_ROOT=${REPO_ROOT}"
+echo "SCRATCH_PROJECT_ROOT=${SCRATCH_PROJECT_ROOT}"
 echo "CONFIG=${CONFIG_ABS}"
 echo "LARGE_ROOT=${LARGE_ROOT}"
 echo "OUT_DIR=${OUT_DIR}"
-echo "OMP_NUM_THREADS=${OMP_NUM_THREADS}"
+echo "CONTINUAL_RL_SEED=${CONTINUAL_RL_SEED}"
 
-cd "${REPO_ROOT}"
-python continual_rl/main.py --config-file "${RUN_JSON}" --output-dir "${OUT_DIR}"
+cd "${CR}"
+python main.py --config-file "${RUN_JSON}" --output-dir "${OUT_DIR}"
 
 echo "=== Done ==="
