@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=pnc-minihack
 #SBATCH --account=yafeng0
-#SBATCH --partition=gpu
+#SBATCH --partition=spgpu
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=64
 #SBATCH --mem=128G
