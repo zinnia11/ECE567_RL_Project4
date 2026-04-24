@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=pnc-minihack
 #SBATCH --account=yafeng0
-#SBATCH --partition=gpu-rtx6000
+#SBATCH --partition=spgpu
 #SBATCH --gpus=1
-#SBATCH --cpus-per-task=64
+#SBATCH --cpus-per-task=16
 #SBATCH --mem=128G
 #SBATCH --time=144:00:00
 #SBATCH --output=logs/%x-%j-%a.log
