@@ -3,7 +3,7 @@
 #SBATCH --account=yafeng0
 #SBATCH --partition=gpu-rtx6000
 #SBATCH --gpus=1
-#SBATCH --cpus-per-task=64
+#SBATCH --cpus-per-task=16
 #SBATCH --mem=128G
 #SBATCH --time=144:00:00
 #SBATCH --output=logs/%x-%j-%a.log
@@ -46,7 +46,7 @@ else
 fi
 mkdir -p "${LARGE_ROOT}"
 
-SEEDS=(42 123 456)
+SEEDS=(456)
 TASK_ID="${SLURM_ARRAY_TASK_ID:-0}"
 SEED="${SEEDS[$TASK_ID]}"
 export CONTINUAL_RL_SEED="${SEED}"
